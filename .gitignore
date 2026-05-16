@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+sample_videos/
+runs/
+datasets/
+pose_landmarker_lite.task
+*.mp4
+*.avi
+*.mov
