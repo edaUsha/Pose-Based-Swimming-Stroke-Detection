@@ -9,7 +9,7 @@ import streamlit as st
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
 from ultralytics import YOLO
-from mediapipe.tasks.python import BaseOptions
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  PAGE CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
@@ -60,7 +60,7 @@ def load_models():
     yolo = YOLO(YOLO_WEIGHTS)
 
     # MediaPipe
-    base_options = mp_python.BaseOptions(model_asset_path=POSE_MODEL_PATH,delegate=BaseOptions.Delegate.CPU)
+    base_options = mp_python.BaseOptions(model_asset_path=POSE_MODEL_PATH)
     mp_options   = vision.PoseLandmarkerOptions(
         base_options=base_options,
         output_segmentation_masks=False,
