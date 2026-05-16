@@ -9,3 +9,4 @@ pose_landmarker_lite.task
 *.mp4
 *.avi
 *.mov
+*.pt
