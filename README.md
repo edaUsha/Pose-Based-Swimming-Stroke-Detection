@@ -1,82 +1,166 @@
-# 🏊 Swimming Stroke Detector
+# 🏊 Pose Based Swimming Stroke Detection
 
-Pose-based swimming stroke detection using **YOLOv8 + MediaPipe Lite**, served as a **Streamlit web app** inside Docker.
+> Real-time swimming stroke classification using YOLOv8 Pose + MediaPipe — trained on a self-collected and annotated dataset.
 
----
-
-## 📁 Required folder structure before building
-
-```
-📁 your_project/
-  ├── app.py
-  ├── Dockerfile
-  ├── .dockerignore
-  ├── requirements.txt
-  └── best(4classes).pt      ← your YOLO weights (must be present)
-```
+[![Hugging Face](https://img.shields.io/badge/🤗%20Demo-Hugging%20Face%20Spaces-blue)](https://huggingface.co/spaces/edaUsha/swimming-stroke-detector)
+[![Python](https://img.shields.io/badge/Python-3.10-blue)](https://python.org)
+[![YOLOv8](https://img.shields.io/badge/YOLOv8-Pose-green)](https://ultralytics.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-App-red)](https://streamlit.io)
 
 ---
 
-## 🐳 Build the Docker image
+## 🎯 Live Demo
+
+👉 **([https://huggingface.co/spaces/edaUsha/swimming-stroke-detector](https://huggingface.co/spaces/edaUsha/Pose-Based-Swimming-Stroke-Detection))**
+
+Upload a swimming video → model detects stroke type frame by frame → annotated video with skeleton overlay returned.
+
+---
+
+## 📌 What It Does
+
+This app automatically identifies which swimming stroke a swimmer is performing by analysing body pose landmarks extracted from video footage.
+
+**Detects 4 strokes:**
+
+| Stroke | Description |
+|---|---|
+| 🏃 Freestyle | Face-down, alternating overhead pull — fastest competitive stroke |
+| 🔄 Backstroke | Face-up, alternating arm pull with flutter kick |
+| 🐸 Breaststroke | Simultaneous arm sweep with frog kick — slowest competitive stroke |
+| 🦋 Butterfly | Simultaneous arm recovery with dolphin kick — most technically demanding |
+
+---
+
+## 🧠 How It Works
+
+```
+Video Input
+    ↓
+YOLOv8 Pose — detects swimmer and extracts 17 body keypoints per frame
+    ↓
+MediaPipe Pose Landmarker — refines skeleton landmarks for accuracy
+    ↓
+Stroke Classification — maps pose patterns to stroke type per frame
+    ↓
+Aggregation — dominant stroke across all frames = Final Answer
+    ↓
+Annotated Video — bounding box + skeleton + stroke name + confidence baked in
+```
+
+---
+
+## 🗂️ Dataset
+
+- **Collected by:** Self-collected video footage of competitive swimmers
+- **Annotated by:** Manually labelled using Roboflow annotation tool
+- **Classes:** 4 (Freestyle, Backstroke, Breaststroke, Butterfly)
+- **Train images:** 698
+- **Annotation type:** Bounding box + pose keypoints
+
+This was not a public dataset — footage was collected and annotated from scratch, making this a genuine end-to-end ML project.
+
+---
+
+## 📊 Model Performance
+
+| Metric | Score |
+|---|---|
+| Precision | 0.701 |
+| Recall | 0.623 |
+| mAP@50 | 0.623 |
+| Model size | ~6MB |
+
+**Base model:** YOLOv8n-pose (pretrained on COCO)
+**Fine-tuned on:** Custom swimming stroke dataset
+
+---
+
+## 🛠️ Tech Stack
+
+| Component | Tool |
+|---|---|
+| Stroke Detection | YOLOv8n-pose (fine-tuned) |
+| Pose Estimation | MediaPipe Pose Landmarker Lite |
+| Video Processing | OpenCV |
+| Web App | Streamlit |
+| Deployment | Hugging Face Spaces |
+| Language | Python 3.10 |
+
+---
+
+## 🚀 Run Locally
 
 ```bash
-docker build -t swimming-stroke-detector .
+# Clone the repo
+git clone https://github.com/edaUsha/swimming-stroke-detector
+cd swimming-stroke-detector
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the app
+streamlit run app.py
 ```
 
-> First build takes ~5–10 minutes (downloads Python packages + PyTorch).  
-> Subsequent builds are fast due to layer caching.
+Open `http://localhost:8501` in your browser.
 
----
-
-## ▶️ Run the container
-
-```bash
-docker run -p 8501:8501 swimming-stroke-detector
+**Requirements:**
 ```
-
-Then open your browser at:  
-**http://localhost:8501**
-
----
-
-## 🔄 Share the image with others
-
-### Option A — Save to a file and share
-```bash
-# On your machine: save
-docker save swimming-stroke-detector | gzip > swimming-stroke-detector.tar.gz
-
-# On their machine: load and run
-docker load < swimming-stroke-detector.tar.gz
-docker run -p 8501:8501 swimming-stroke-detector
-```
-
-### Option B — Push to Docker Hub
-```bash
-docker tag swimming-stroke-detector YOUR_DOCKERHUB_USERNAME/swimming-stroke-detector
-docker push YOUR_DOCKERHUB_USERNAME/swimming-stroke-detector
-
-# Others pull and run with:
-docker run -p 8501:8501 YOUR_DOCKERHUB_USERNAME/swimming-stroke-detector
+streamlit
+ultralytics
+opencv-python-headless
+numpy
+mediapipe==0.10.9
 ```
 
 ---
 
-## 🛑 Stop the container
+## 📁 Project Structure
 
-```bash
-# Find the running container ID
-docker ps
-
-# Stop it
-docker stop <CONTAINER_ID>
+```
+swimming-stroke-detector/
+│
+├── app.py                    ← Streamlit web app
+├── best(4classes).pt         ← fine-tuned YOLOv8 model weights
+├── requirements.txt          ← Python dependencies
+├── packages.txt              ← system dependencies for deployment
+└── README.md                 ← this file
 ```
 
 ---
 
-## ⚙️ Notes
+## 💡 Key Features
 
-- The **MediaPipe Lite model** (`pose_landmarker_lite.task`) is auto-downloaded on first run inside the container and cached for the session.
-- The app runs on port **8501** by default.
-- No GPU required — runs on CPU.
-- Tested on Python 3.10 / Ubuntu slim base.
+- **Live frame preview** — watch inference happen in real time as video processes
+- **Skeleton overlay** — 17 body keypoints connected on swimmer's body
+- **Bounding box** — swimmer localisation with stroke label and confidence score
+- **Final Answer card** — dominant stroke across all frames with percentage agreement
+- **Annotated video download** — take away the processed output
+- **Adjustable settings** — confidence threshold, inference frequency, scale
+
+---
+
+## ⚠️ Limitations
+
+- Works best with side-view or overhead camera angles
+- Optimised for competitive swimming strokes only
+- Free tier deployment runs on CPU — videos under 15 seconds recommended
+- Model trained on limited dataset — accuracy improves with more training data
+
+---
+
+## 🔮 Future Work
+
+- Expand dataset with more diverse swimmers and pool environments
+- Add stroke technique scoring (e.g. arm entry angle, kick frequency)
+- Real-time webcam inference
+- GPU deployment for faster processing
+- Multi-swimmer detection in the same frame
+
+---
+
+
+---
+
+*Built as part of an AI/ML portfolio — Computer Vision · Deep Learning · Pose Estimation · Real-time Inference*
