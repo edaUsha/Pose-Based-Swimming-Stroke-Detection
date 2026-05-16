@@ -10,3 +10,5 @@ libglib2.0-dev
 libegl1
 libegl-mesa0
 libgbm1
+libgles2
+libgl1
