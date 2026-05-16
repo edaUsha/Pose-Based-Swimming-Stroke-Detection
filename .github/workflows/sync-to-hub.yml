@@ -11,6 +11,8 @@ jobs:
         with:
           fetch-depth: 0
           lfs: true
+      - name: Remove binary .pt files before pushing
+        run: git rm --cached '*.pt'
       - name: Push to HF Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
