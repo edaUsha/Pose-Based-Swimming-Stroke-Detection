@@ -9,7 +9,7 @@ import streamlit as st
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
 from ultralytics import YOLO
-from mediapipe.tasks.python import BaseOptions, VisionTaskRunner
+from mediapipe.tasks.python import BaseOptions
 # ─────────────────────────────────────────────────────────────────────────────
 #  PAGE CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
