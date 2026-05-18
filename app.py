@@ -1,13 +1,10 @@
 import cv2
-import mediapipe as mp
 import numpy as np
 import os
 import time
 import urllib.request
 import tempfile
 import streamlit as st
-from mediapipe.tasks import python as mp_python
-from mediapipe.tasks.python import vision
 from ultralytics import YOLO
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -21,7 +18,7 @@ st.set_page_config(
 )
 
 st.title("🏊 Swimming Stroke Detection")
-st.markdown("Upload a swimming video to detect and annotate stroke types using YOLOv8 + MediaPipe Pose.")
+st.markdown("Upload a swimming video to detect and annotate stroke types using YOLOv8 Pose.")
 st.info("⚠️ For best performance upload videos under 30 seconds. Processing takes 2-3 minutes on CPU.")
 # ─────────────────────────────────────────────────────────────────────────────
 #  CONFIGURATION
@@ -29,10 +26,10 @@ st.info("⚠️ For best performance upload videos under 30 seconds. Processing 
 
 YOLO_WEIGHTS       = "best(4classes).pt"      # Must be in the same folder as app.py
 CONFIDENCE_THRESH  = 0.3
-YOLO_EVERY_N_FRAMES = 2
-POSE_EVERY_N_FRAMES = 4
+YOLO_EVERY_N_FRAMES = 4
+#POSE_EVERY_N_FRAMES = 4
 INFER_SCALE         = 0.5
-POSE_MODEL_PATH     = "pose_landmarker_lite.task"
+#POSE_MODEL_PATH     = "pose_landmarker_lite.task"
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  MODEL LOADING  (cached so they load only once per session)
@@ -40,49 +37,13 @@ POSE_MODEL_PATH     = "pose_landmarker_lite.task"
 
 @st.cache_resource(show_spinner="Loading models…")
 def load_models():
-    # Download MediaPipe Lite model if not present
-    if not os.path.exists(POSE_MODEL_PATH):
-        url = (
-            "https://storage.googleapis.com/mediapipe-models/"
-            "pose_landmarker/pose_landmarker_lite/float16/latest/"
-            "pose_landmarker_lite.task"
-        )
-        urllib.request.urlretrieve(url, POSE_MODEL_PATH)
-
-    # YOLO
-    if not os.path.exists(YOLO_WEIGHTS):
-        st.error(
-            f"❌ YOLO weights file `{YOLO_WEIGHTS}` not found. "
-            "Please place it in the same folder as app.py."
-        )
-        st.stop()
-
-    yolo = YOLO(YOLO_WEIGHTS)
-
-    # MediaPipe
-    base_options = mp_python.BaseOptions(model_asset_path=POSE_MODEL_PATH)
-    mp_options   = vision.PoseLandmarkerOptions(
-        base_options=base_options,
-        output_segmentation_masks=False,
-        min_pose_detection_confidence=CONFIDENCE_THRESH,
-        min_pose_presence_confidence=CONFIDENCE_THRESH,
-        min_tracking_confidence=CONFIDENCE_THRESH,
-    )
-    pose_detector = vision.PoseLandmarker.create_from_options(mp_options)
-
-    return yolo, pose_detector
-
+    yolo= YOLO(YOLO_WEIGHTS)
+    return yolo
+    
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  CONSTANTS
 # ─────────────────────────────────────────────────────────────────────────────
-
-POSE_CONNECTIONS = [
-    (11, 12), (11, 13), (13, 15),
-    (12, 14), (14, 16), (11, 23),
-    (12, 24), (23, 24), (23, 25),
-    (25, 27), (24, 26), (26, 28),
-]
 
 STROKE_COLORS = {
     "backstroke":   (0,   255, 0),
@@ -121,83 +82,32 @@ def draw_yolo_box(frame, x1, y1, x2, y2, label, conf, color):
     cv2.putText(frame, text, (x1 + 4, label_y),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 0), 2, cv2.LINE_AA)
 
-def draw_keypoints(frame, landmarks, w, h, thresh):
-    for lm in landmarks:
-        if lm.visibility >= thresh:
-            cx = int(lm.x * w)
-            cy = int(lm.y * h)
-            cv2.circle(frame, (cx, cy), 5, (255, 255, 255), 2)
-            cv2.circle(frame, (cx, cy), 3, (0, 200, 255), -1)
 
-def draw_skeleton(frame, landmarks, w, h, thresh):
-    for s, e in POSE_CONNECTIONS:
-        if landmarks[s].visibility >= thresh and landmarks[e].visibility >= thresh:
-            sx, sy = int(landmarks[s].x * w), int(landmarks[s].y * h)
-            ex, ey = int(landmarks[e].x * w), int(landmarks[e].y * h)
-            cv2.line(frame, (sx, sy), (ex, ey), (0, 255, 180), 2)
 
-def compute_pose_confidence(landmarks, thresh):
-    scores = [lm.visibility for lm in landmarks if lm.visibility >= thresh]
-    return sum(scores) / len(scores) if scores else 0.0
-
-def draw_info_panel(frame, stroke_label, yolo_conf, pose_conf, current_fps):
+def draw_info_panel(frame, stroke_label, yolo_conf):
     h, w  = frame.shape[:2]
     color = get_color(stroke_label)
-
     if is_portrait(w, h):
-        draw_transparent_box(frame, 0, 0, w, 95, color, alpha=0.55)
+        draw_transparent_box(frame, 0, 0, w, 75, color, alpha=0.55)
         cv2.putText(frame, stroke_label.upper(),
-                    (12, 38), cv2.FONT_HERSHEY_SIMPLEX, 1.1, color, 3, cv2.LINE_AA)
-
-        det_color = (0,255,0) if yolo_conf>=0.7 else (0,200,255) if yolo_conf>=0.5 else (0,80,255)
-        cv2.putText(frame, f"Det: {yolo_conf:.2f}",
-                    (12, 76), cv2.FONT_HERSHEY_SIMPLEX, 0.72, det_color, 2, cv2.LINE_AA)
-
-        pose_color = (0,255,0) if pose_conf>=0.7 else (0,200,255) if pose_conf>=0.5 else (0,80,255)
-        cv2.putText(frame, f"Pose: {pose_conf:.2f}",
-                    (w//2 - 65, 76), cv2.FONT_HERSHEY_SIMPLEX, 0.72, pose_color, 2, cv2.LINE_AA)
-
-        fps_text = f"FPS: {current_fps:.1f}"
-        fps_tw   = cv2.getTextSize(fps_text, cv2.FONT_HERSHEY_SIMPLEX, 0.72, 2)[0][0]
-        cv2.putText(frame, fps_text,
-                    (w - fps_tw - 12, 76), cv2.FONT_HERSHEY_SIMPLEX, 0.72,
-                    (255, 255, 0), 2, cv2.LINE_AA)
-
-        tag   = "YOLOv8n + MP Lite"
-        tag_w = cv2.getTextSize(tag, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0][0]
-        cv2.putText(frame, tag, (w - tag_w - 10, h - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (180, 180, 180), 1, cv2.LINE_AA)
+                    (12,38), cv2.FONT_HERSHEY_SIMPLEX, 1.1, color, 3, cv2.LINE_AA)
+        det_c = (0,255,0) if yolo_conf>=0.7 else (0,200,255) if yolo_conf>=0.5 else (0,80,255)
+        cv2.putText(frame, f"Conf: {yolo_conf:.2f}",
+                    (12,65), cv2.FONT_HERSHEY_SIMPLEX, 0.72, det_c, 2, cv2.LINE_AA)
     else:
-        panel_w = min(440, w - 20)
-        draw_transparent_box(frame, 10, h-130, panel_w, h-10, color, alpha=0.45)
-
+        panel_w = min(380, w-20)
+        draw_transparent_box(frame, 10, h-100, panel_w, h-10, color, alpha=0.45)
         cv2.putText(frame, f"Stroke: {stroke_label.capitalize()}",
-                    (20, h-90), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2, cv2.LINE_AA)
-
-        det_color = (0,255,0) if yolo_conf>=0.7 else (0,200,255) if yolo_conf>=0.5 else (0,80,255)
-        cv2.putText(frame, f"Detection Confidence : {yolo_conf:.2f}",
-                    (20, h-58), cv2.FONT_HERSHEY_SIMPLEX, 0.72, det_color, 2, cv2.LINE_AA)
-
-        pose_color = (0,255,0) if pose_conf>=0.7 else (0,200,255) if pose_conf>=0.5 else (0,80,255)
-        cv2.putText(frame, f"Pose Confidence      : {pose_conf:.2f}",
-                    (20, h-25), cv2.FONT_HERSHEY_SIMPLEX, 0.72, pose_color, 2, cv2.LINE_AA)
-
-        fps_text = f"FPS: {current_fps:.1f}"
-        fps_tw   = cv2.getTextSize(fps_text, cv2.FONT_HERSHEY_SIMPLEX, 0.75, 2)[0][0]
-        cv2.rectangle(frame, (w-fps_tw-20, 8), (w-8, 38), (0,0,0), -1)
-        cv2.putText(frame, fps_text, (w-fps_tw-12, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255,255,0), 2, cv2.LINE_AA)
-
-        tag = "YOLOv8n + MP Lite"
-        cv2.putText(frame, tag, (w-160, h-10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (180,180,180), 1, cv2.LINE_AA)
-
+                    (20,h-65), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2, cv2.LINE_AA)
+        det_c = (0,255,0) if yolo_conf>=0.7 else (0,200,255) if yolo_conf>=0.5 else (0,80,255)
+        cv2.putText(frame, f"Confidence: {yolo_conf:.2f}",
+                    (20,h-30), cv2.FONT_HERSHEY_SIMPLEX, 0.72, det_c, 2, cv2.LINE_AA)
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  CORE PROCESSING FUNCTION
 # ─────────────────────────────────────────────────────────────────────────────
 
-def process_video(input_path: str, output_path: str, yolo_model, pose_detector,
+def process_video(input_path: str, output_path: str, yolo_model,yolo_every, infer_scale,
                   live_placeholder, progress_bar, status_text):
     """
     Process the video frame by frame.
@@ -215,19 +125,19 @@ def process_video(input_path: str, output_path: str, yolo_model, pose_detector,
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps    = cap.get(cv2.CAP_PROP_FPS) or 25.0
     total  = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    MAX_FRAMES = 150   # ~5 seconds at 30fps
+    total = min(total, MAX_FRAMES)
 
-    fourcc = cv2.VideoWriter_fourcc(*'avc1')
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out    = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
-    infer_w = int(width  * INFER_SCALE)
-    infer_h = int(height * INFER_SCALE)
+    infer_w = int(width  * infer_scale)
+    infer_h = int(height * infer_scale)
 
     # Cached state
     cached_stroke_label = "Unknown"
     cached_yolo_conf    = 0.0
     cached_yolo_box     = None
-    cached_landmarks    = None
-    cached_pose_conf    = 0.0
 
     frame_count = 0
     fps_start   = time.time()
@@ -251,7 +161,8 @@ def process_video(input_path: str, output_path: str, yolo_model, pose_detector,
         scale_y     = h / infer_h
 
         # ── YOLO ──────────────────────────────────────────────────────────────
-        if frame_count % YOLO_EVERY_N_FRAMES == 0:
+        #if frame_count % YOLO_EVERY_N_FRAMES == 0:
+        if frame_count % yolo_every == 0:    
             results = yolo_model(small_frame, conf=CONFIDENCE_THRESH, verbose=False)
             if results and len(results[0].boxes) > 0:
                 boxes    = results[0].boxes
@@ -267,17 +178,7 @@ def process_video(input_path: str, output_path: str, yolo_model, pose_detector,
                 cached_stroke_label = "Unknown"
                 cached_yolo_conf    = 0.0
 
-        # ── MediaPipe Lite ────────────────────────────────────────────────────
-        if frame_count % POSE_EVERY_N_FRAMES == 0:
-            rgb       = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
-            mp_image  = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-            mp_result = pose_detector.detect(mp_image)
-            if mp_result.pose_landmarks:
-                cached_landmarks = mp_result.pose_landmarks[0]
-                cached_pose_conf = compute_pose_confidence(cached_landmarks, CONFIDENCE_THRESH)
-            else:
-                cached_landmarks = None
-                cached_pose_conf = 0.0
+        
 
         # ── Draw ──────────────────────────────────────────────────────────────
         if cached_yolo_box:
@@ -285,19 +186,11 @@ def process_video(input_path: str, output_path: str, yolo_model, pose_detector,
                           cached_stroke_label, cached_yolo_conf,
                           get_color(cached_stroke_label))
 
-        if cached_landmarks:
-            class ScaledLM:
-                def __init__(self, lm):
-                    self.x          = lm.x * infer_w * scale_x / w
-                    self.y          = lm.y * infer_h * scale_y / h
-                    self.visibility = lm.visibility
-            scaled = [ScaledLM(lm) for lm in cached_landmarks]
-            draw_skeleton(frame, scaled, w, h, CONFIDENCE_THRESH)
-            draw_keypoints(frame, scaled, w, h, CONFIDENCE_THRESH)
 
-        if cached_yolo_box or cached_landmarks:
+
+        if cached_yolo_box:
             draw_info_panel(frame, cached_stroke_label,
-                            cached_yolo_conf, cached_pose_conf, current_fps)
+                            cached_yolo_conf)
         else:
             if is_portrait(w, h):
                 draw_transparent_box(frame, 0, 0, w, 55, (0,0,255), alpha=0.5)
@@ -358,16 +251,20 @@ def reencode_for_web(src: str, dst: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Load models once
-yolo_model, pose_detector = load_models()
+yolo_model= load_models()
 
 # ── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.header("⚙️ Settings")
-    confidence = st.slider("Confidence Threshold", 0.1, 0.9, CONFIDENCE_THRESH, 0.05)
-    yolo_skip  = st.slider("Run YOLO every N frames", 1, 6, YOLO_EVERY_N_FRAMES)
-    pose_skip  = st.slider("Run Pose every N frames", 1, 8, POSE_EVERY_N_FRAMES)
-    infer_scale = st.slider("Inference scale", 0.25, 1.0, INFER_SCALE, 0.05,
-                             help="Lower = faster but less accurate")
+    #confidence = st.slider("Confidence Threshold", 0.1, 0.9, CONFIDENCE_THRESH, 0.05)
+    #yolo_skip  = st.slider("Run YOLO every N frames", 1, 6, YOLO_EVERY_N_FRAMES)
+    #pose_skip  = st.slider("Run Pose every N frames", 1, 8, POSE_EVERY_N_FRAMES)
+    #infer_scale = st.slider("Inference scale", 0.25, 1.0, INFER_SCALE, 0.05,help="Lower = faster but less accurate")
+    
+    # Change defaults to be more CPU-friendly
+    yolo_every  = st.select_slider("YOLO Frequency",  options=[1,2,3,4], value=4)
+    #pose_every  = st.select_slider("Pose Frequency",  options=[1,2,3,4,5,6], value=6)
+    infer_scale = st.select_slider("Inference Scale", options=[0.4,0.5,0.6,0.75,1.0], value=0.4)
     st.markdown("---")
     st.markdown("**Stroke colour legend**")
     for stroke, bgr in STROKE_COLORS.items():
@@ -415,14 +312,19 @@ if uploaded_file is not None:
         status_text  = st.empty()
 
         # Run processing
+
+        
         success = process_video(
             input_path, output_raw,
-            yolo_model, pose_detector,
+            yolo_model,
+            yolo_every, infer_scale,
             live_placeholder, progress_bar, status_text,
         )
 
         
         if success:
+            output_web = reencode_for_web(output_raw, output_web)
+            
             progress_bar.progress(1.0)
             status_text.text("✅ Processing complete!")
             
@@ -431,37 +333,31 @@ if uploaded_file is not None:
             st.write(f"Output file exists: {os.path.exists(output_raw)}")
             st.write(f"Output file size: {os.path.getsize(output_raw) if os.path.exists(output_raw) else 'FILE MISSING'} bytes")
 
-            st.markdown("---")
-            st.subheader("✅ Annotated Output Video")
+            #st.markdown("---")
+            #st.subheader("✅ Annotated Output Video")
 
-            with open(output_raw, "rb") as f:
+            with open(output_web, "rb") as f:
                 video_bytes = f.read()
 
-            import base64
-            
-            b64 = base64.b64encode(video_bytes).decode()
-            st.markdown(
-                f"""
-                <video controls autoplay width="100%"
-                    style="border-radius:8px; margin-top:8px;">
-                  <source src="data:video/mp4;base64,{b64}" type="video/mp4">
-                  Your browser does not support the video tag.
-                </video>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.session_state["video_bytes"]    = video_bytes
+            st.session_state["video_filename"] = f"annotated_{uploaded_file.name}"
 
-            st.download_button(
-                label="⬇️ Download Annotated Video",
-                data=video_bytes,
-                file_name=f"annotated_{uploaded_file.name}",
-                mime="video/mp4",
-                width='stretch',
-            )
-
-        # Cleanup temp files
+# Cleanup temp files
         for p in [input_path, output_raw, output_web]:
             try:
                 os.remove(p)
             except Exception:
                 pass
+
+        # Same indent as 'if success:' and cleanup block
+        if "video_bytes" in st.session_state:
+            st.markdown("---")
+            st.subheader("✅ Annotated Output Video")
+            st.video(st.session_state["video_bytes"])
+            st.download_button(
+                label="⬇️ Download Annotated Video",
+                data=st.session_state["video_bytes"],
+                file_name=st.session_state["video_filename"],
+                mime="video/mp4",
+                width='stretch',
+            )
