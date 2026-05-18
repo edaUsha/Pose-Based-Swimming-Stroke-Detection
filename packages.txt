@@ -4,10 +4,3 @@ libxext6
 libxrender-dev
 libgomp1
 ffmpeg
-libgles2
-libgl1
-libglib2.0-dev
-libegl1
-libegl-mesa0
-libgbm1
-
