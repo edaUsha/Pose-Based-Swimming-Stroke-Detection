@@ -4,4 +4,4 @@ opencv-python-headless
 numpy
 pandas
 Pillow
-mediapipe==0.10.35
+
