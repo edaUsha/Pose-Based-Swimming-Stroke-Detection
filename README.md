@@ -34,28 +34,7 @@ A single-stage pose detection pipeline optimized for real-time inference:
 
 ---
 
-## 🧠 Technical Architecture
 
-```
-Video Input (mp4/avi)
-    ↓
-[YOLOv8n-pose] — Swimmer detection + 17 keypoint extraction
-                  (inference every N frames for speed optimization)
-    ↓
-[Stroke Pattern Matching] — Map pose keypoints to stroke classification
-    ↓
-[Frame Caching Strategy] — Reuse predictions for N frames to maintain efficiency
-    ↓
-[Temporal Aggregation] — Dominant stroke across all frames
-    ↓
-Annotated Output Video
-  ├─ Bounding box with stroke label
-  ├─ Skeleton overlay (17 keypoints)
-  ├─ Confidence score per detection
-  └─ Responsive text layout (portrait/landscape aware)
-```
-
----
 
 ## 📊 Model Performance & Results
 
@@ -179,7 +158,6 @@ Pose-Based-Swimming-Stroke-Detection/
 | **Side-view camera dependency** | Top/front angles underperform | Competitive swimming videos are typically side-view; documented limitation |
 | **CPU inference speed** | 8-12 FPS limits real-time applications | Free tier deployment; GPU deployment available but requires paid hosting |
 | **Competitive strokes only** | Non-standard strokes not recognized | Model scope is intentional; extensible architecture for future classes |
-| **Fixed max frame count** | 150 frames (~5 seconds) per video | Prevents memory overflow on free tier; can be adjusted for paid deployments |
 
 ---
 
@@ -202,29 +180,6 @@ Pose-Based-Swimming-Stroke-Detection/
 
 ---
 
-## 💡 Skills Demonstrated
-
-✅ **Computer Vision & Deep Learning**
-- Transfer learning from foundation models (COCO-pretrained YOLOv8)
-- Real-time pose estimation optimization (frame skipping, resolution scaling)
-- Model performance evaluation (Precision, Recall, mAP metrics)
-
-✅ **ML Engineering & MLOps**
-- End-to-end ML lifecycle (problem definition → data collection → annotation → training → deployment)
-- Model fine-tuning and validation on custom datasets
-- Production deployment on cloud infrastructure
-
-✅ **Software Engineering**
-- Clean, modular architecture (separate concerns: video processing, inference, rendering)
-- Full-stack application (backend ML pipeline + interactive frontend)
-- Video codec handling and browser compatibility optimization
-
-✅ **Product & UX Thinking**
-- User-centric design (intuitive settings, live feedback, responsive layouts)
-- Performance optimization for constrained environments (CPU inference)
-- Clear documentation of model limitations and use cases
-
----
 
 ## 📚 References & Resources
 
