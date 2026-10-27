@@ -2,10 +2,7 @@
 
 **Real-time swimming stroke classification system using YOLOv8 Pose estimation — end-to-end ML project from dataset collection to production deployment.**
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Hugging%20Face%20Spaces-blue?style=flat-square)](https://huggingface.co/spaces/edaUsha/swimming-stroke-detector)
-[![Python](https://img.shields.io/badge/Python-3.10-blue?style=flat-square)](https://python.org)
-[![YOLOv8](https://img.shields.io/badge/YOLOv8-Pose%20Estimation-green?style=flat-square)](https://ultralytics.com)
-[![Streamlit](https://img.shields.io/badge/Streamlit-Web%20App-red?style=flat-square)](https://streamlit.io)
+deployment link: https://huggingface.co/spaces/edaUsha/Pose-Based-Swimming-Stroke-Detection
 
 ---
 
